@@ -1,85 +1,65 @@
+import requests
+import subprocess
 import sys
 import os
+import zipfile
 
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
+REPO = "GuigoNt/BrainDesk"
+VERSAO_ATUAL = "v1.0.0"
 
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
+def verificar_update():
+    try:
+        url = f"https://api.github.com/repos/{REPO}/releases/latest"
+        response = requests.get(url, timeout=5)
 
-os.environ["ANONYMIZED_TELEMETRY"] = "False"
+        if response.status_code != 200:
+            return
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "meu_banco")
+        data = response.json()
+        versao_online = data["tag_name"]
 
-modelo = None
-client = None
+        if versao_online != VERSAO_ATUAL:
+            print("🔄 Atualização encontrada!")
 
-def carregar_modelo():
-    global modelo
-    if modelo is None:
-        from sentence_transformers import SentenceTransformer
-        modelo = SentenceTransformer("all-MiniLM-L6-v2")
-    return modelo
+            download_url = data["assets"][0]["browser_download_url"]
+            baixar_e_atualizar(download_url)
 
-def get_collection(nome="estudos"):
-    global client
-    if client is None:
-        import chromadb
-        client = chromadb.Client(
-            settings=chromadb.config.Settings(
-                persist_directory=DB_PATH
-            )
-        )
-    return client.get_or_create_collection(name=nome)
+    except Exception as e:
+        print("Erro ao verificar update:", e)
 
-# ================= FUNÇÕES =================
+def baixar_e_atualizar(url):
+    try:
+        print("⬇️ Baixando atualização...")
 
-def adicionar_texto(texto, id, materia="geral"):
-    modelo = carregar_modelo()
-    collection = get_collection(materia)
+        r = requests.get(url)
+        with open("update.zip", "wb") as f:
+            f.write(r.content)
 
-    embedding = modelo.encode(texto).tolist()
+        print("✅ Download concluído")
 
-    collection.add(
-        documents=[texto],
-        embeddings=[embedding],
-        ids=[id]
-    )
+        with zipfile.ZipFile("update.zip", 'r') as zip_ref:
+            zip_ref.extractall("nova_versao")
 
-    client.persist()
+        executar_updater()
 
+    except Exception as e:
+        print("Erro ao baixar update:", e)
 
-def buscar_contexto(pergunta, materia="geral"):
-    modelo = carregar_modelo()
-    collection = get_collection(materia)
+def executar_updater():
+    try:
+        bat = """
+        @echo off
+        timeout /t 2 > nul
+        xcopy nova_versao\\* . /E /H /C /I /Y
+        start BrainDesk.exe
+        exit
+        """
 
-    embedding = modelo.encode(pergunta).tolist()
+        with open("update.bat", "w") as f:
+            f.write(bat)
 
-    resultados = collection.query(
-        query_embeddings=[embedding],
-        n_results=3
-    )
+        subprocess.Popen("update.bat", shell=True)
+        sys.exit()
 
-    if resultados["documents"]:
-        return " ".join(resultados["documents"][0])
-    return "Sem contexto ainda."
-
-
-def listar_tudo(materia="geral"):
-    collection = get_collection(materia)
-    dados = collection.get()
-
-    if dados["documents"]:
-        return "\n\n".join(dados["documents"])
-    return "Nada salvo ainda."
-
-
-def limpar_memoria(materia="geral"):
-    global client
-    collection = get_collection(materia)
-
-    dados = collection.get()
-    if dados["ids"]:
-        collection.delete(ids=dados["ids"])
-        client.persist()
+    except Exception as e:
+        print("Erro no updater:", e)
