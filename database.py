@@ -1,5 +1,11 @@
 import sys
 import os
+import chromadb
+from chromadb.config import Settings
+
+client = chromadb.Client(Settings(
+    anonymized_telemetry=False
+))
 
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")
