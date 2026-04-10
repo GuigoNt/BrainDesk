@@ -1,12 +1,7 @@
 import sys
 import os
-import chromadb
-from chromadb.config import Settings
 
-client = chromadb.Client(Settings(
-    anonymized_telemetry=False
-))
-
+# Corrigir erro do PyInstaller
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")
 
@@ -15,13 +10,16 @@ if sys.stderr is None:
 
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
+# ================= CONFIG =================
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "meu_banco")
 
 modelo = None
 client = None
 
-# 🔥 LAZY LOADING TOTAL
+# ================= MODELO =================
+
 def carregar_modelo():
     global modelo
     if modelo is None:
@@ -29,16 +27,23 @@ def carregar_modelo():
         modelo = SentenceTransformer("all-MiniLM-L6-v2")
     return modelo
 
+# ================= CHROMA (FIXO) =================
 
 def get_client():
     global client
+
     if client is None:
         import chromadb
+        from chromadb.config import Settings
+
         client = chromadb.Client(
-            settings=chromadb.config.Settings(
-                persist_directory=DB_PATH
+            Settings(
+                persist_directory=DB_PATH,
+                anonymized_telemetry=False,
+                is_persistent=True
             )
         )
+
     return client
 
 
