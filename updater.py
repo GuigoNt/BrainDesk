@@ -5,7 +5,7 @@ import os
 import zipfile
 
 REPO = "GuigoNt/BrainDesk"
-VERSAO_ATUAL = "v1.0.0"
+VERSAO_ATUAL = "v1.0.1"
 
 def verificar_update():
     try:
